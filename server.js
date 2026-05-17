@@ -159,6 +159,13 @@ app.post('/api/auth/logout', (req, res) => {
 
 app.get('/api/auth/status', (req, res) => {
   try {
+    const token = req.cookies && req.cookies.session;
+    if (token) {
+      const rawUser = findUser(u => u.activeSessionToken === token);
+      if (rawUser && rawUser.role !== 'admin' && rawUser.expiresAt && new Date() > new Date(rawUser.expiresAt)) {
+        return res.json({ authenticated: false, reason: 'expired' });
+      }
+    }
     const user = getSessionUser(req);
     if (!user) return res.json({ authenticated: false });
     user.lastSeen = new Date().toISOString();
@@ -363,6 +370,16 @@ function sendHtml(res, filePath) {
   res.status(404).send('Not found');
 }
 
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Service-Worker-Allowed', '/');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(ROOT, 'sw.js'));
+});
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Service-Worker-Allowed', '/');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(ROOT, 'sw.js'));
+});
 app.get('/', (req, res) => sendHtml(res, 'login.html'));
 app.get('/login', (req, res) => sendHtml(res, 'login.html'));
 app.get('/upgrades/robux', (req, res) => sendHtml(res, 'upgrades/robux.html'));

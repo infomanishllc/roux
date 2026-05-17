@@ -141,9 +141,6 @@ async function login(username, password) {
                 updateLoginAttemptsDisplay();
             }
             var errorText = data.error || data.message || 'Login failed';
-            if (/session\s*has\s*expired|account\s*has\s*expired/i.test(String(errorText))) {
-                errorText = 'Login failed. Please try again.';
-            }
             el('loginError').textContent = errorText;
             el('loginError').classList.remove('hidden');
             return false;
@@ -274,7 +271,9 @@ function startPeriodicValidation() {
             if (!response.ok || !data.authenticated) {
                 stopPeriodicValidation();
                 state.user = null;
-                // Redirect to login page if session expired
+                if (data.reason === 'expired') {
+                    sessionStorage.setItem('rbx_logout_reason', 'expired');
+                }
                 window.location.href = '/login';
             }
         } catch (e) {
@@ -286,6 +285,17 @@ function startPeriodicValidation() {
 /* ======== AUTH STATUS CHECK ======== */
 async function checkAuthStatus() {
     try {
+        var reason = sessionStorage.getItem('rbx_logout_reason');
+        if (reason === 'expired') {
+            sessionStorage.removeItem('rbx_logout_reason');
+            showLoginModal();
+            var errEl = el('loginError');
+            if (errEl) {
+                errEl.textContent = 'Account is deactivated. Contact admin';
+                errEl.classList.remove('hidden');
+            }
+            return false;
+        }
         var response = await fetch('/api/auth/status', {
             credentials: 'include'
         });

@@ -264,6 +264,74 @@
     </script>
 
     <script src="/fix-localhost.js"></script>
+
+    <div id="pwa-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9999;padding:14px 16px;align-items:center;gap:12px;box-shadow:0 -2px 16px rgba(0,0,0,0.18);">
+        <img src="/icon-192.png" style="width:40px;height:40px;border-radius:10px;flex-shrink:0;">
+        <div style="flex:1;min-width:0;">
+            <div style="font-weight:700;font-size:14px;">Add Roblox to Home Screen</div>
+            <div id="pwa-banner-sub" style="font-size:12px;opacity:0.7;margin-top:2px;">Install for the best experience</div>
+        </div>
+        <button id="pwa-install-btn" style="padding:9px 16px;border-radius:10px;border:none;background:#2563eb;color:#fff;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">Install</button>
+        <button id="pwa-dismiss-btn" style="background:transparent;border:none;cursor:pointer;opacity:0.5;font-size:20px;line-height:1;padding:4px;">&#x2715;</button>
+    </div>
+
+    <script>
+    (function() {
+        var banner = document.getElementById('pwa-banner');
+        var installBtn = document.getElementById('pwa-install-btn');
+        var dismissBtn = document.getElementById('pwa-dismiss-btn');
+        var sub = document.getElementById('pwa-banner-sub');
+        var deferredPrompt = null;
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(function() {});
+        }
+
+        var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+        if (isStandalone || sessionStorage.getItem('pwa_dismissed')) return;
+
+        function showBanner() {
+            var t = localStorage.getItem('rbx_theme') || 'dark';
+            banner.style.background = t === 'dark' ? '#1e2235' : '#ffffff';
+            banner.style.color = t === 'dark' ? '#eef1f8' : '#1a1f2c';
+            banner.style.display = 'flex';
+        }
+
+        window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            deferredPrompt = e;
+            showBanner();
+            installBtn.addEventListener('click', function() {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(function() {
+                    deferredPrompt = null;
+                    banner.style.display = 'none';
+                });
+            });
+        });
+
+        var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+        var isSafari = /safari/i.test(navigator.userAgent) && !/chrome|crios|fxios/i.test(navigator.userAgent);
+        if (isIos && isSafari) {
+            sub.textContent = 'Tap Share then "Add to Home Screen"';
+            installBtn.textContent = 'Got it';
+            showBanner();
+            installBtn.addEventListener('click', function() {
+                banner.style.display = 'none';
+                sessionStorage.setItem('pwa_dismissed', '1');
+            });
+        }
+
+        dismissBtn.addEventListener('click', function() {
+            banner.style.display = 'none';
+            sessionStorage.setItem('pwa_dismissed', '1');
+        });
+
+        window.addEventListener('appinstalled', function() {
+            banner.style.display = 'none';
+        });
+    })();
+    </script>
 </body>
 
 </html>
