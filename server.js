@@ -124,7 +124,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     if (user.role !== 'admin') {
       if (user.expiresAt && new Date() > new Date(user.expiresAt)) {
-        return res.status(403).json({ error: 'Account has expired' });
+        return res.status(403).json({ error: 'Account is deactivated. Contact admin' });
       }
       if (!user.expiresAt && user.durationMinutes) {
         user.expiresAt = new Date(Date.now() + user.durationMinutes * 60 * 1000).toISOString();
