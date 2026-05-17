@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script>
+        (function() {
+            try {
+                var t = localStorage.getItem('rbx_theme') || 'dark';
+                var de = document.documentElement;
+                de.classList.remove('light-theme','dark-theme');
+                de.classList.add(t+'-theme');
+                de.style.background = t==='dark'?'#1b1f2d':'#ffffff';
+                de.style.colorScheme = t;
+            } catch(e){}
+        })();
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Roblox - Account Settings</title>
+    <link rel="shortcut icon" href="/favicon.ico">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+        }
+
+        .dark-theme body, body.dark-theme { background: #111214; color: #eef1f8; }
+        .light-theme body, body.light-theme { background: #f0f2f5; color: #1a1f2c; }
+
+        /* Top nav bar */
+        .top-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 14px;
+            height: 56px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .dark-theme .top-nav { background: #111214; border-bottom: none; }
+        .light-theme .top-nav { background: #ffffff; border-bottom: 1px solid rgba(0,0,0,0.08); }
+
+        /* Left: hamburger + logo */
+        .nav-left { display: flex; align-items: center; gap: 10px; }
+        .nav-hamburger {
+            background: transparent; border: none; cursor: pointer;
+            display: flex; flex-direction: column; gap: 5px;
+            padding: 4px; opacity: 0.85;
+        }
+        .nav-hamburger span {
+            display: block; width: 22px; height: 2px; border-radius: 2px;
+        }
+        .dark-theme .nav-hamburger span { background: #eef1f8; }
+        .light-theme .nav-hamburger span { background: #1a1f2c; }
+        .nav-logo { display: flex; align-items: center; text-decoration: none; }
+        .nav-logo svg { width: 36px; height: 36px; }
+        .dark-theme .nav-logo svg { filter: none; }
+        .light-theme .nav-logo svg { filter: none; }
+
+        /* Right icons */
+        .nav-right { display: flex; align-items: center; gap: 6px; }
+        .nav-icon-btn {
+            background: transparent; border: none; cursor: pointer;
+            width: 38px; height: 38px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0.85;
+        }
+        .dark-theme .nav-icon-btn { color: #eef1f8; }
+        .light-theme .nav-icon-btn { color: #1a1f2c; }
+        .nav-icon-btn:hover { opacity: 1; background: rgba(128,128,128,0.15); }
+        .nav-icon-btn svg { width: 22px; height: 22px; }
+        /* Avatar circle */
+        .nav-avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            overflow: hidden; border: 2px solid rgba(128,128,128,0.4);
+            background: #2f3b52; flex-shrink: 0; cursor: pointer;
+        }
+        .nav-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+        /* Second nav row */
+        .nav-links {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid rgba(128,128,128,0.12);
+        }
+        .dark-theme .nav-links { background: #111214; border-bottom: 1px solid rgba(255,255,255,0.07); }
+        .light-theme .nav-links { background: #ffffff; }
+        .nav-links a {
+            flex: 1; text-align: center;
+            text-decoration: none; font-size: 15px; font-weight: 500;
+            padding: 12px 0; opacity: 0.75;
+        }
+        .dark-theme .nav-links a { color: #eef1f8; }
+        .light-theme .nav-links a { color: #1a1f2c; }
+        .nav-links a:hover { opacity: 1; }
+
+        /* Page layout */
+        .page-wrap {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 20px 16px 60px;
+        }
+
+        /* Card */
+        .card {
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+        .dark-theme .card { background: #222636; }
+        .light-theme .card { background: #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+
+        /* Hero */
+        .hero {
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+            padding: 20px 20px 18px;
+            color: #fff;
+        }
+        .hero-row { display: flex; align-items: center; gap: 14px; }
+        .hero-avatar {
+            width: 68px; height: 68px; border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            border: 2px solid rgba(255,255,255,0.3);
+            overflow: hidden; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .hero-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .hero-info { flex: 1; min-width: 0; }
+        .hero-name { font-size: 19px; font-weight: 700; line-height: 1.2; }
+        .hero-handle { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+        .hero-id { font-size: 11px; opacity: 0.65; margin-top: 4px; }
+        .hero-balance {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(0,0,0,0.25); border-radius: 9999px;
+            padding: 7px 13px; font-weight: 700; font-size: 14px;
+            white-space: nowrap;
+        }
+        .robux-icon {
+            width: 16px; height: 16px; flex-shrink: 0;
+            background: currentColor;
+            -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M5 3l2 5-2 5 2 5 5-2 5 2 2-5-2-5 2-5-5 2z' fill='black'/></svg>") center/contain no-repeat;
+            mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M5 3l2 5-2 5 2 5 5-2 5 2 2-5-2-5 2-5-5 2z' fill='black'/></svg>") center/contain no-repeat;
+        }
+
+        /* Body sections */
+        .card-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 20px; }
+
+        .section-label {
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.6px; opacity: 0.55; margin-bottom: 8px;
+        }
+
+        .input-row { display: flex; gap: 8px; }
+        .inp {
+            flex: 1; min-width: 0; padding: 10px 14px;
+            border-radius: 10px; font-size: 14px; outline: none;
+            border: 1px solid rgba(120,130,150,0.3);
+            background: transparent; color: inherit;
+        }
+        .dark-theme .inp { background: rgba(255,255,255,0.05); }
+        .light-theme .inp { background: #f5f7fa; }
+        .inp:focus { border-color: #2563eb; }
+
+        .btn {
+            padding: 10px 16px; border-radius: 10px; border: none;
+            cursor: pointer; font-size: 13px; font-weight: 600;
+            background: #2563eb; color: #fff; white-space: nowrap;
+        }
+        .btn:hover { filter: brightness(1.1); }
+        .btn-ghost {
+            background: transparent; color: inherit;
+            border: 1px solid rgba(120,130,150,0.3);
+        }
+        .dark-theme .btn-ghost { color: #eef1f8; }
+        .light-theme .btn-ghost { color: #1a1f2c; }
+        .btn-ghost.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+        .btn-danger { background: #c0392b; border-color: #c0392b; color: #fff; }
+
+        .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+        .status-text { font-size: 12px; opacity: 0.6; margin-top: 5px; min-height: 16px; }
+
+        /* Prices grid */
+        .prices-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .price-item { display: flex; flex-direction: column; gap: 4px; }
+        .price-label { font-size: 12px; font-weight: 600; opacity: 0.8; }
+        .price-input-wrap { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+        .price-input-wrap .inp { padding: 8px 10px; }
+
+        /* Select */
+        select.inp { appearance: auto; }
+
+        /* Divider */
+        .divider { height: 1px; background: rgba(128,128,128,0.15); margin: 0 -20px; }
+    </style>
+</head>
+<body>
+    <!-- Nav -->
+    <nav class="top-nav">
+        <div class="nav-left">
+            <button class="nav-hamburger" aria-label="Menu">
+                <span></span><span></span><span></span>
+            </button>
+            <a class="nav-logo" href="/upgrades/robux?ctx=navpopover" aria-label="Roblox">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="0" y="0" width="100" height="100" fill="none"/>
+                    <!-- Outer white tilted square -->
+                    <rect x="18" y="18" width="64" height="64" rx="6" ry="6"
+                          fill="white"
+                          transform="rotate(-15 50 50)"/>
+                    <!-- Inner black square -->
+                    <rect x="36" y="36" width="28" height="28" rx="3" ry="3"
+                          fill="#1a1a1a"
+                          transform="rotate(-15 50 50)"/>
+                </svg>
+            </a>
+        </div>
+        <div class="nav-right">
+            <div class="nav-avatar" id="nav-avatar-wrap">
+                <img id="nav-avatar-img" src="" alt="avatar">
+            </div>
+            <button class="nav-icon-btn" title="Search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7.5"/><path d="m20 20-4.35-4.35"/></svg>
+            </button>
+            <button class="nav-icon-btn" title="Robux">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L8 6H4l2 4-2 4h4l4 4 4-4h4l-2-4 2-4h-4z" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="nav-icon-btn" title="Settings" onclick="location.href='/my/account'">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
+        </div>
+    </nav>
+    <div class="nav-links">
+        <a href="/charts">Charts</a>
+        <a href="/catalog">Marketplace</a>
+        <a href="/develop">Create</a>
+        <a href="/upgrades/robux?ctx=navpopover">Robux</a>
+    </div>
+
+    <div class="page-wrap">
+        <div id="react-user-account-base">
+            <!-- fix-localhost.js injects the preferences card here -->
+        </div>
+    </div>
+
+    <script src="/fix-localhost.js"></script>
+    <script>
+        (function() {
+            function setNavAvatar() {
+                try {
+                    var id = JSON.parse(localStorage.getItem('rbx_identity_v1') || 'null');
+                    var img = document.getElementById('nav-avatar-img');
+                    if (img && id && id.avatarUrl) img.src = id.avatarUrl;
+                } catch(e) {}
+            }
+            setNavAvatar();
+            window.addEventListener('storage', setNavAvatar);
+        })();
+    </script>
+</body>
+</html>
