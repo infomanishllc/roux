@@ -2810,6 +2810,32 @@
         return n.toLocaleString('en-US');
     }
 
+    function showRobuxSentNotification(amount, toName) {
+        var existing = document.getElementById('rbx-sent-toast');
+        if (existing) existing.remove();
+        var toast = document.createElement('div');
+        toast.id = 'rbx-sent-toast';
+        toast.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-20px);z-index:2147483647;background:#1a1c1e;color:#fff;border-radius:14px;padding:14px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,0.5);min-width:260px;max-width:90vw;opacity:0;transition:opacity 0.25s ease,transform 0.25s ease;pointer-events:none;';
+        toast.innerHTML =
+            '<div style="width:36px;height:36px;border-radius:50%;background:#22c55e;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+            '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+            '</div>' +
+            '<div>' +
+            '<div style="font-weight:700;font-size:15px;">Robux Sent</div>' +
+            '<div style="font-size:13px;color:#9ea1a3;margin-top:2px;">' + fmtNum(amount) + ' Robux sent to ' + escHtml(toName) + '</div>' +
+            '</div>';
+        document.body.appendChild(toast);
+        requestAnimationFrame(function() {
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateX(-50%) translateY(0)';
+        });
+        setTimeout(function() {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(-50%) translateY(-20px)';
+            setTimeout(function() { if (toast.parentNode) toast.remove(); }, 300);
+        }, 3500);
+    }
+
     function closeSendRobuxModal() {
         var b = document.querySelector('.rbx-send-backdrop');
         if (b) b.remove();
@@ -2999,19 +3025,12 @@
                     })
                     .then(function() {
                         closeSendRobuxModal();
-                        // After a successful send on mobile the user is usually scrolled
-                        // mid-page — slide back to the top so the updated balance pill is
-                        // visible. Use smooth scroll on the window and any scroll parent.
+                        showRobuxSentNotification(amount, displayName);
                         try {
-                            window.scrollTo({
-                                top: 0,
-                                behavior: 'smooth'
-                            });
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
                             document.documentElement.scrollTop = 0;
                             document.body.scrollTop = 0;
-                        } catch (_) {
-                            window.scrollTo(0, 0);
-                        }
+                        } catch (_) { window.scrollTo(0, 0); }
                     });
             } catch (e) {
                 try {
@@ -3019,14 +3038,8 @@
                     setRobuxBalance(String(Math.max(0, cur - amount)));
                 } catch (_) {}
                 closeSendRobuxModal();
-                try {
-                    window.scrollTo({
-                        top: 0,
-                        behavior: 'smooth'
-                    });
-                } catch (_) {
-                    window.scrollTo(0, 0);
-                }
+                showRobuxSentNotification(amount, displayName);
+                try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) { window.scrollTo(0, 0); }
             }
         });
 
