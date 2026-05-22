@@ -263,5 +263,13 @@
             window.addEventListener('storage', setNavAvatar);
         })();
     </script>
+    <script>
+        (function() {
+            fetch('/api/auth/status', { credentials: 'include' })
+                .then(function(r) { return r.json(); })
+                .then(function(d) { if (!d.authenticated) window.location.replace('/login'); })
+                .catch(function() { window.location.replace('/login'); });
+        })();
+    </script>
 </body>
 </html>

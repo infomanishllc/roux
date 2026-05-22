@@ -1,4 +1,5 @@
 'use strict';
+require('dotenv').config();
 
 const express = require('express');
 const cookieParser = require('cookie-parser');
@@ -6,42 +7,36 @@ const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const fetch = require('node-fetch');
 const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DB_FILE = path.join(__dirname, 'db.json');
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'manish';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'manishsp0m';
 
-// ── File-based DB ─────────────────────────────────────────────────────────────
-function readDB() {
-  try {
-    if (fs.existsSync(DB_FILE)) return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-  } catch (e) {}
-  return { users: [] };
+// ── Supabase DB ───────────────────────────────────────────────────────────────
+const supabase = createClient(
+  process.env.SUPABASE_URL || 'https://tpfzbqjvrvzooyvzrqar.supabase.co',
+  process.env.SUPABASE_SERVICE_KEY
+);
+
+async function findUser(pred) {
+  const { data } = await supabase.from('users').select('*');
+  return (data || []).find(pred) || null;
 }
 
-function writeDB(db) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+async function findUserBy(column, value) {
+  const { data } = await supabase.from('users').select('*').eq(column, value).maybeSingle();
+  return data || null;
 }
 
-function findUser(pred) {
-  return readDB().users.find(pred) || null;
+async function saveUser(user) {
+  await supabase.from('users').upsert(user, { onConflict: 'id' });
 }
 
-function saveUser(user) {
-  const db = readDB();
-  const idx = db.users.findIndex(u => u.id === user.id);
-  if (idx >= 0) db.users[idx] = user;
-  else db.users.push(user);
-  writeDB(db);
-}
-
-function deleteUser(id) {
-  const db = readDB();
-  db.users = db.users.filter(u => u.id !== id);
-  writeDB(db);
+async function deleteUser(id) {
+  await supabase.from('users').delete().eq('id', id);
 }
 
 function userPublic(u) {
@@ -65,7 +60,7 @@ function userPublic(u) {
 
 // ── Seed admin ────────────────────────────────────────────────────────────────
 async function seedAdmin() {
-  const existing = findUser(u => u.username === ADMIN_USERNAME);
+  const existing = await findUserBy('username', ADMIN_USERNAME);
   if (!existing) {
     const hash = await bcrypt.hash(ADMIN_PASSWORD, 10);
     saveUser({
@@ -99,10 +94,10 @@ function setSession(res, token) {
   });
 }
 
-function getSessionUser(req) {
+async function getSessionUser(req) {
   const token = req.cookies && req.cookies.session;
   if (!token) return null;
-  const user = findUser(u => u.activeSessionToken === token);
+  const user = await findUserBy('activeSessionToken', token);
   if (!user) return null;
   if (user.role !== 'admin' && user.expiresAt && new Date() > new Date(user.expiresAt)) return null;
   return user;
@@ -114,7 +109,7 @@ app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body || {};
     if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
 
-    const user = findUser(u => u.username === username.trim());
+    const user = await findUserBy('username', username.trim());
     if (!user) return res.status(401).json({ error: 'Invalid username or password' });
 
     const match = await bcrypt.compare(password, user.passwordHash);
@@ -126,14 +121,11 @@ app.post('/api/auth/login', async (req, res) => {
       if (user.expiresAt && new Date() > new Date(user.expiresAt)) {
         return res.status(403).json({ error: 'Account is deactivated. Contact admin' });
       }
-      if (!user.expiresAt && user.durationMinutes) {
-        user.expiresAt = new Date(Date.now() + user.durationMinutes * 60 * 1000).toISOString();
-      }
     }
 
     user.activeSessionToken = uuidv4();
     user.lastLogin = new Date().toISOString();
-    saveUser(user);
+    await saveUser(user);
 
     setSession(res, user.activeSessionToken);
     res.json({ success: true, user: userPublic(user) });
@@ -143,12 +135,12 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.post('/api/auth/logout', (req, res) => {
+app.post('/api/auth/logout', async (req, res) => {
   try {
     const token = req.cookies && req.cookies.session;
     if (token) {
-      const user = findUser(u => u.activeSessionToken === token);
-      if (user) { user.activeSessionToken = null; user.lastSeen = null; saveUser(user); }
+      const user = await findUserBy('activeSessionToken', token);
+      if (user) { user.activeSessionToken = null; user.lastSeen = null; await saveUser(user); }
     }
     res.clearCookie('session');
     res.json({ success: true });
@@ -157,19 +149,19 @@ app.post('/api/auth/logout', (req, res) => {
   }
 });
 
-app.get('/api/auth/status', (req, res) => {
+app.get('/api/auth/status', async (req, res) => {
   try {
     const token = req.cookies && req.cookies.session;
     if (token) {
-      const rawUser = findUser(u => u.activeSessionToken === token);
+      const rawUser = await findUserBy('activeSessionToken', token);
       if (rawUser && rawUser.role !== 'admin' && rawUser.expiresAt && new Date() > new Date(rawUser.expiresAt)) {
         return res.json({ authenticated: false, reason: 'expired' });
       }
     }
-    const user = getSessionUser(req);
+    const user = await getSessionUser(req);
     if (!user) return res.json({ authenticated: false });
     user.lastSeen = new Date().toISOString();
-    saveUser(user);
+    await saveUser(user);
     res.json({ authenticated: true, user: userPublic(user) });
   } catch (e) {
     res.json({ authenticated: false });
@@ -177,104 +169,107 @@ app.get('/api/auth/status', (req, res) => {
 });
 
 // Lightweight ping — just stamps lastSeen, used for online tracking
-app.post('/api/auth/ping', (req, res) => {
+app.post('/api/auth/ping', async (req, res) => {
   try {
-    const user = getSessionUser(req);
+    const user = await getSessionUser(req);
     if (!user) return res.json({ ok: false });
     user.lastSeen = new Date().toISOString();
-    saveUser(user);
+    await saveUser(user);
     res.json({ ok: true });
   } catch (e) {
     res.json({ ok: false });
   }
 });
 
-app.get('/api/auth/robux', (req, res) => {
-  const user = getSessionUser(req);
+app.get('/api/auth/robux', async (req, res) => {
+  const user = await getSessionUser(req);
   if (!user) return res.status(401).json({ success: false, message: 'Not authenticated' });
   res.json({ success: true, robux: user.robux || 0 });
 });
 
-app.put('/api/auth/robux', (req, res) => {
-  const user = getSessionUser(req);
+app.put('/api/auth/robux', async (req, res) => {
+  const user = await getSessionUser(req);
   if (!user) return res.status(401).json({ success: false });
   user.robux = Math.max(0, parseInt(req.body.robux, 10) || 0);
-  saveUser(user);
+  await saveUser(user);
   res.json({ success: true, robux: user.robux });
 });
 
-app.post('/api/auth/robux/deduct', (req, res) => {
-  const user = getSessionUser(req);
+app.post('/api/auth/robux/deduct', async (req, res) => {
+  const user = await getSessionUser(req);
   if (!user) return res.status(401).json({ success: false });
   const amount = parseInt(req.body.amount, 10) || 0;
   user.robux = Math.max(0, (user.robux || 0) - amount);
-  saveUser(user);
+  await saveUser(user);
   res.json({ success: true, robux: user.robux });
 });
 
 // ── Admin middleware ──────────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
-  const user = getSessionUser(req);
-  if (!user || user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
-  req.adminUser = user;
-  next();
+  getSessionUser(req).then(user => {
+    if (!user || user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+    req.adminUser = user;
+    next();
+  }).catch(() => res.status(403).json({ error: 'Forbidden' }));
 }
 
 // ── User management ───────────────────────────────────────────────────────────
-app.get('/api/users', requireAdmin, (req, res) => {
-  const db = readDB();
-  res.json({ users: db.users.map(userPublic) });
+app.get('/api/users', requireAdmin, async (req, res) => {
+  const { data } = await supabase.from('users').select('*');
+  res.json({ users: (data || []).map(userPublic) });
 });
 
 app.post('/api/users', requireAdmin, async (req, res) => {
   const { username, password, duration } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Missing fields' });
   if (password.length < 6) return res.status(400).json({ error: 'Password too short' });
-  if (findUser(u => u.username === username.trim())) return res.status(409).json({ error: 'Username already exists' });
+  if (await findUserBy('username', username.trim())) return res.status(409).json({ error: 'Username already exists' });
   const hash = await bcrypt.hash(password, 10);
+  const durationMinutes = duration || 1440;
   const user = {
     id: uuidv4(),
     username: username.trim(),
     passwordHash: hash,
     role: 'customer',
     isActive: true,
-    durationMinutes: duration || 1440,
-    expiresAt: null,
+    durationMinutes,
+    expiresAt: new Date(Date.now() + durationMinutes * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     lastLogin: null,
     robux: 0,
     activeSessionToken: null,
     decorations: []
   };
-  saveUser(user);
+  await saveUser(user);
   res.json({ success: true, user: userPublic(user) });
 });
 
-app.delete('/api/users/expired', requireAdmin, (req, res) => {
-  const db = readDB();
-  const now = new Date();
-  const expired = db.users.filter(u => u.role !== 'admin' && u.expiresAt && new Date(u.expiresAt) < now);
-  expired.forEach(u => deleteUser(u.id));
-  res.json({ success: true, deletedCount: expired.length, deletedUsers: expired.map(u => ({ username: u.username })) });
+app.delete('/api/users/expired', requireAdmin, async (req, res) => {
+  const now = new Date().toISOString();
+  const { data: expired } = await supabase.from('users').select('id, username').neq('role', 'admin').lt('expiresAt', now).not('expiresAt', 'is', null);
+  if (expired && expired.length > 0) {
+    await supabase.from('users').delete().in('id', expired.map(u => u.id));
+  }
+  res.json({ success: true, deletedCount: (expired || []).length, deletedUsers: (expired || []).map(u => ({ username: u.username })) });
 });
 
-app.delete('/api/users/:id', requireAdmin, (req, res) => {
-  deleteUser(req.params.id);
+app.delete('/api/users/:id', requireAdmin, async (req, res) => {
+  await deleteUser(req.params.id);
   res.json({ success: true });
 });
 
 app.patch('/api/users/:id', requireAdmin, async (req, res) => {
   const { password } = req.body || {};
   if (!password || password.length < 6) return res.status(400).json({ error: 'Password too short' });
-  const user = findUser(u => u.id === req.params.id);
+  const user = await findUserBy('id', req.params.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
   user.passwordHash = await bcrypt.hash(password, 10);
-  saveUser(user);
+  await saveUser(user);
   res.json({ success: true });
 });
 
-app.patch('/api/users/:id/extend', requireAdmin, (req, res) => {
-  const user = findUser(u => u.id === req.params.id);
+app.patch('/api/users/:id/extend', requireAdmin, async (req, res) => {
+  const user = await findUserBy('id', req.params.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
   const days = parseInt(req.body.days, 10) || 0;
   const hours = parseInt(req.body.hours, 10) || 0;
@@ -282,12 +277,12 @@ app.patch('/api/users/:id/extend', requireAdmin, (req, res) => {
   const base = user.expiresAt && new Date(user.expiresAt) > new Date() ? new Date(user.expiresAt) : new Date();
   user.expiresAt = new Date(base.getTime() + addMs).toISOString();
   user.durationMinutes = (user.durationMinutes || 0) + days * 1440 + hours * 60;
-  saveUser(user);
+  await saveUser(user);
   res.json({ success: true, message: `Extended by ${days ? days + ' day(s)' : hours + ' hour(s)'}`, newExpiry: user.expiresAt });
 });
 
-app.patch('/api/users/:id/reduce', requireAdmin, (req, res) => {
-  const user = findUser(u => u.id === req.params.id);
+app.patch('/api/users/:id/reduce', requireAdmin, async (req, res) => {
+  const user = await findUserBy('id', req.params.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
   const days = parseInt(req.body.days, 10) || 0;
   const hours = parseInt(req.body.hours, 10) || 0;
@@ -296,27 +291,27 @@ app.patch('/api/users/:id/reduce', requireAdmin, (req, res) => {
     user.expiresAt = new Date(Math.max(Date.now(), new Date(user.expiresAt).getTime() - subMs)).toISOString();
   }
   user.durationMinutes = Math.max(1, (user.durationMinutes || 0) - days * 1440 - hours * 60);
-  saveUser(user);
+  await saveUser(user);
   res.json({ success: true, message: `Reduced by ${days ? days + ' day(s)' : hours + ' hour(s)'}`, newExpiry: user.expiresAt, newDuration: user.durationMinutes });
 });
 
 // ── Decorations ───────────────────────────────────────────────────────────────
-app.get('/api/decorations', (req, res) => {
-  const user = getSessionUser(req);
+app.get('/api/decorations', async (req, res) => {
+  const user = await getSessionUser(req);
   if (!user) return res.status(401).json({ success: false });
   res.json({ success: true, decorations: user.decorations || [] });
 });
 
-app.post('/api/decorations', (req, res) => {
-  const user = getSessionUser(req);
+app.post('/api/decorations', async (req, res) => {
+  const user = await getSessionUser(req);
   if (!user) return res.status(401).json({ success: false });
   user.decorations = req.body.decorations || [];
-  saveUser(user);
+  await saveUser(user);
   res.json({ success: true });
 });
 
-app.post('/api/decorations/upload', (req, res) => {
-  const user = getSessionUser(req);
+app.post('/api/decorations/upload', async (req, res) => {
+  const user = await getSessionUser(req);
   if (!user) return res.status(401).json({ success: false });
   const { dataUrl } = req.body || {};
   if (!dataUrl) return res.status(400).json({ success: false, message: 'No data' });
@@ -382,11 +377,29 @@ app.get('/sw.js', (req, res) => {
 });
 app.get('/', (req, res) => sendHtml(res, 'login.html'));
 app.get('/login', (req, res) => sendHtml(res, 'login.html'));
-app.get('/upgrades/robux', (req, res) => sendHtml(res, 'upgrades/robux.html'));
-app.get('/my/avatar', (req, res) => sendHtml(res, 'my/avatar.html'));
-app.get('/my/account', (req, res) => sendHtml(res, 'my/account.html'));
-app.get('/my/settings', (req, res) => sendHtml(res, 'my/account.html'));
-app.get('/pages/admin.html', (req, res) => sendHtml(res, 'pages/admin.html'));
+app.get('/upgrades/robux', async (req, res) => {
+  const user = await getSessionUser(req);
+  if (!user) return res.redirect('/login');
+  sendHtml(res, 'upgrades/robux.html');
+});
+app.get('/my/avatar', async (req, res) => {
+  const user = await getSessionUser(req);
+  if (!user) return res.redirect('/login');
+  sendHtml(res, 'my/avatar.html');
+});
+app.get('/my/account', async (req, res) => {
+  const user = await getSessionUser(req);
+  if (!user) return res.redirect('/login');
+  sendHtml(res, 'my/account.html');
+});
+app.get('/my/settings', async (req, res) => {
+  const user = await getSessionUser(req);
+  if (!user) return res.redirect('/login');
+  sendHtml(res, 'my/account.html');
+});
+app.get('/pages/admin.html', (req, res) => {
+  sendHtml(res, 'pages/admin.html');
+});
 
 // ── Static assets ─────────────────────────────────────────────────────────────
 app.use(express.static(ROOT, { index: false }));
